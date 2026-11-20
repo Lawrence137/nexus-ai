@@ -1,7 +1,6 @@
 
 "use client";
 
-import { useState } from "react";
 import { Menu } from "lucide-react";
 
 import type { ChatMessage } from "@/types/chat";
@@ -14,7 +13,7 @@ type Props = {
   title?: string;
   initialMessages: ChatMessage[];
   selectedModel: string;
-  onModelChange: (modelId: string) => void;
+  onModelChange: (id: string) => void;
   onMenuClick: () => void;
   onSend: (message: string) => void;
 };
@@ -27,24 +26,6 @@ export default function ChatWindow({
   onMenuClick,
   onSend,
 }: Props) {
-  const [messages, setMessages] = useState(initialMessages);
-
-  function handleSend(message: string) {
-    const newMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: message,
-      createdAt: new Date(),
-    };
-
-    setMessages((previous) => [...previous, newMessage]);
-    onSend(message);
-  }
-
-  function handlePrompt(prompt: string) {
-    handleSend(prompt);
-  }
-
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-[#141416]">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:px-6">
@@ -74,18 +55,18 @@ export default function ChatWindow({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {messages.length === 0 ? (
+        {initialMessages.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
-            <WelcomeScreen onPrompt={handlePrompt} />
+            <WelcomeScreen onPrompt={onSend} />
           </div>
         ) : (
-          <MessageList messages={messages} />
+          <MessageList messages={initialMessages} />
         )}
       </div>
 
       <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
-          <ChatInput onSend={handleSend} />
+          <ChatInput onSend={onSend} />
 
           <p className="mt-3 text-center text-[11px] text-zinc-600">
             Nexus AI can make mistakes. Verify important information.
