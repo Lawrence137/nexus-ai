@@ -6,6 +6,11 @@ import type { UIMessage } from "ai";
 import { Menu, RefreshCw } from "lucide-react";
 
 import type { ChatMessage } from "@/types/chat";
+import {
+  createConversation,
+  upsertMessage,
+} from "@/lib/supabase/chat";
+
 import ModelSelector from "./ModelSelector";
 import WelcomeScreen from "./WelcomeScreen";
 import MessageList from "./MessageList";
@@ -61,7 +66,11 @@ export default function ChatWindow({
     () => conversationId ?? crypto.randomUUID()
   );
 
-  const startedRef = useRef(initialMessages.length > 0);
+  const [persistenceError, setPersistenceError] = useState("");
+
+  const startedRef = useRef(
+    Boolean(conversationId) || initialMessages.length > 0
+  );
 
   const {
     messages,
@@ -74,8 +83,24 @@ export default function ChatWindow({
     id: chatId,
     messages: toUIMessages(initialMessages),
 
-    onFinish: ({ messages }) => {
-      onMessagesChange(chatId, toChatMessages(messages));
+    onFinish: async ({ messages }) => {
+      const chatMessages = toChatMessages(messages);
+
+      try {
+        // Upsert all messages so regenerated responses update
+        // their existing database records.
+        for (const message of chatMessages) {
+          await upsertMessage(chatId, message);
+        }
+
+        setPersistenceError("");
+        onMessagesChange(chatId, chatMessages);
+      } catch (err) {
+        console.error("Message persistence error:", err);
+        setPersistenceError(
+          "Your response was generated, but saving it failed. Please check your connection."
+        );
+      }
     },
 
     onError: (error) => {
@@ -89,23 +114,45 @@ export default function ChatWindow({
   async function handleSend(message: string) {
     if (status !== "ready") return;
 
-    if (!startedRef.current) {
-      onConversationStart(chatId, message);
-      startedRef.current = true;
-    }
+    setPersistenceError("");
 
-    await sendMessage(
-      { text: message },
-      {
-        body: {
-          modelId: selectedModel,
-        },
+    try {
+      if (!startedRef.current) {
+        // Create the database conversation using the same ID
+        // already assigned to this AI chat.
+        await createConversation(
+          message,
+          selectedModel,
+          chatId
+        );
+
+        onConversationStart(chatId, message);
+        startedRef.current = true;
       }
-    );
+
+      await sendMessage(
+        { text: message },
+        {
+          body: {
+            modelId: selectedModel,
+          },
+        }
+      );
+    } catch (err) {
+      console.error("Unable to start conversation:", err);
+
+      setPersistenceError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save your conversation. Please try again."
+      );
+    }
   }
 
   async function handleRegenerate() {
     if (status !== "ready") return;
+
+    setPersistenceError("");
 
     await regenerate({
       body: {
@@ -117,6 +164,8 @@ export default function ChatWindow({
   async function handleRetry() {
     if (status !== "ready" || !error) return;
 
+    setPersistenceError("");
+
     await regenerate({
       body: {
         modelId: selectedModel,
@@ -127,19 +176,21 @@ export default function ChatWindow({
   const displayMessages = toChatMessages(messages);
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col bg-[#141416]">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:px-6">
-        <div className="flex items-center gap-3">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#141416]">
+      {/* Header */}
+      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button
+            type="button"
             onClick={onMenuClick}
-            className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 lg:hidden"
+            className="shrink-0 rounded-lg p-2 text-zinc-400 transition hover:bg-white/10 lg:hidden"
             aria-label="Open sidebar"
           >
             <Menu size={20} />
           </button>
 
-          <div>
-            <p className="text-sm font-medium text-white">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">
               {title || "New conversation"}
             </p>
 
@@ -149,15 +200,18 @@ export default function ChatWindow({
           </div>
         </div>
 
-        <ModelSelector
-          selectedModel={selectedModel}
-          onSelect={onModelChange}
-        />
+        <div className="shrink-0">
+          <ModelSelector
+            selectedModel={selectedModel}
+            onSelect={onModelChange}
+          />
+        </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Messages */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         {displayMessages.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-1 items-center justify-center px-3">
             <WelcomeScreen onPrompt={handleSend} />
           </div>
         ) : (
@@ -172,29 +226,33 @@ export default function ChatWindow({
           />
         )}
 
-        {error && (
+        {(error || persistenceError) && (
           <div
             role="alert"
-            className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3"
+            className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 px-4"
           >
             <p className="text-sm text-red-400">
-              Your response couldn't be generated. Please try again.
+              {persistenceError ||
+                "Your response couldn't be generated. Please try again."}
             </p>
 
-            <button
-              type="button"
-              onClick={handleRetry}
-              disabled={status !== "ready"}
-              className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <RefreshCw size={14} />
-              Retry
-            </button>
+            {error && (
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={status !== "ready"}
+                className="flex shrink-0 items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RefreshCw size={14} />
+                Retry
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
+      {/* Chat input */}
+      <div className="shrink-0 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-4">
         <div className="mx-auto w-full max-w-3xl">
           <ChatInput
             onSend={handleSend}

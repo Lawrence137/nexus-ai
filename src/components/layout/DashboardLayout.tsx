@@ -1,40 +1,139 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import ChatSidebar from "@/components/sidebar/ChatSidebar";
 import ChatWindow from "@/components/chat/ChatWindow";
 
-import { INITIAL_CONVERSATIONS } from "@/lib/mock-data";
+import {
+  getConversations,
+  getMessages,
+} from "@/lib/supabase/chat";
+
 import { DEFAULT_MODEL } from "@/lib/ai/model-registry";
 import type { Conversation, ChatMessage } from "@/types/chat";
 
-export default function DashboardLayout() {
-  const [conversations, setConversations] =
-    useState<Conversation[]>(INITIAL_CONVERSATIONS);
+const ACTIVE_CHAT_KEY = "nexus-active-conversation";
 
+export default function DashboardLayout() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const [selectedModel, setSelectedModel] =
-    useState(DEFAULT_MODEL.id);
-
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL.id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const selectionRequest = useRef(0);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeId),
     [conversations, activeId]
   );
 
+  // Load conversations and restore the previously active chat.
+  useEffect(() => {
+    let mounted = true;
+
+    async function initializeDashboard() {
+      try {
+        setLoading(true);
+        setLoadError("");
+
+        const data = await getConversations();
+
+        if (!mounted) return;
+
+        setConversations(data);
+
+        const savedId = localStorage.getItem(ACTIVE_CHAT_KEY);
+
+        if (savedId && data.some((c) => c.id === savedId)) {
+          const messages = await getMessages(savedId);
+
+          if (!mounted) return;
+
+          setConversations((previous) =>
+            previous.map((conversation) =>
+              conversation.id === savedId
+                ? { ...conversation, messages }
+                : conversation
+            )
+          );
+
+          setActiveId(savedId);
+        } else {
+          localStorage.removeItem(ACTIVE_CHAT_KEY);
+        }
+      } catch (error) {
+        console.error("Dashboard initialization failed:", error);
+
+        if (mounted) {
+          setLoadError(
+            "Couldn't load your conversations. Please refresh."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    initializeDashboard();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Start a new conversation.
   function handleNewChat() {
+    selectionRequest.current += 1;
+
+    localStorage.removeItem(ACTIVE_CHAT_KEY);
+
     setActiveId(null);
     setSidebarOpen(false);
+    setLoadError("");
   }
 
-  function handleSelectConversation(id: string) {
-    setActiveId(id);
+  // Fetch messages BEFORE mounting ChatWindow.
+  async function handleSelectConversation(id: string) {
+    const requestId = ++selectionRequest.current;
+
     setSidebarOpen(false);
+    setLoadError("");
+
+    try {
+      const messages = await getMessages(id);
+
+      // Ignore an outdated request if another chat was selected.
+      if (requestId !== selectionRequest.current) return;
+
+      setConversations((previous) =>
+        previous.map((conversation) =>
+          conversation.id === id
+            ? { ...conversation, messages }
+            : conversation
+        )
+      );
+
+      // Set active chat only after its messages have been loaded.
+      setActiveId(id);
+      localStorage.setItem(ACTIVE_CHAT_KEY, id);
+    } catch (error) {
+      console.error("Failed to load conversation:", error);
+
+      if (requestId === selectionRequest.current) {
+        setLoadError(
+          "Couldn't open this conversation. Please try again."
+        );
+      }
+    }
   }
 
+  // Add a new conversation to local state.
   function handleConversationStart(id: string, message: string) {
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -42,6 +141,10 @@ export default function DashboardLayout() {
       content: message,
       createdAt: new Date(),
     };
+
+    localStorage.setItem(ACTIVE_CHAT_KEY, id);
+
+    setActiveId(id);
 
     setConversations((previous) => {
       const existing = previous.find((c) => c.id === id);
@@ -70,6 +173,7 @@ export default function DashboardLayout() {
     });
   }
 
+  // Keep local conversation history synchronized with ChatWindow.
   function handleMessagesChange(
     id: string,
     messages: ChatMessage[]
@@ -87,6 +191,7 @@ export default function DashboardLayout() {
     );
 
     setActiveId(id);
+    localStorage.setItem(ACTIVE_CHAT_KEY, id);
   }
 
   return (
@@ -96,7 +201,7 @@ export default function DashboardLayout() {
         <ChatSidebar
           conversations={conversations}
           activeId={activeId}
-          onSelect={setActiveId}
+          onSelect={handleSelectConversation}
           onNewChat={handleNewChat}
         />
       </aside>
@@ -124,18 +229,33 @@ export default function DashboardLayout() {
       )}
 
       {/* Main chat area */}
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <ChatWindow
-          key={activeId ?? "new-chat"}
-          conversationId={activeId ?? undefined}
-          title={activeConversation?.title}
-          initialMessages={activeConversation?.messages ?? []}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          onMenuClick={() => setSidebarOpen(true)}
-          onConversationStart={handleConversationStart}
-          onMessagesChange={handleMessagesChange}
-        />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {loadError && (
+          <div
+            role="alert"
+            className="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-center text-sm text-red-400"
+          >
+            {loadError}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
+            Loading your conversations...
+          </div>
+        ) : (
+          <ChatWindow
+            key={activeId ?? "new-chat"}
+            conversationId={activeId ?? undefined}
+            title={activeConversation?.title}
+            initialMessages={activeConversation?.messages ?? []}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+            onMenuClick={() => setSidebarOpen(true)}
+            onConversationStart={handleConversationStart}
+            onMessagesChange={handleMessagesChange}
+          />
+        )}
       </div>
     </div>
   );
