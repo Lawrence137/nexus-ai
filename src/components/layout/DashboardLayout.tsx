@@ -8,13 +8,17 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import {
   getConversations,
   getMessages,
+  getConversationModel,
+  deleteConversation,
 } from "@/lib/supabase/chat";
 
 import { DEFAULT_MODEL } from "@/lib/ai/model-registry";
 import type { Conversation, ChatMessage } from "@/types/chat";
-import { generateConversationTitle } from "@/lib/chat-utils"; 
-import { getSavedModel, saveSelectedModel } from "@/lib/ai/model-preference"; 
-import { getConversationModel } from "@/lib/supabase/chat";
+import { generateConversationTitle } from "@/lib/chat-utils";
+import {
+  getSavedModel,
+  saveSelectedModel,
+} from "@/lib/ai/model-preference";
 
 const ACTIVE_CHAT_KEY = "nexus-active-conversation";
 
@@ -26,6 +30,7 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const selectionRequest = useRef(0);
 
@@ -43,6 +48,12 @@ export default function DashboardLayout() {
         setLoading(true);
         setLoadError("");
 
+        const savedModel = getSavedModel();
+
+        if (savedModel) {
+          setSelectedModel(savedModel);
+        }
+
         const data = await getConversations();
 
         if (!mounted) return;
@@ -52,7 +63,10 @@ export default function DashboardLayout() {
         const savedId = localStorage.getItem(ACTIVE_CHAT_KEY);
 
         if (savedId && data.some((c) => c.id === savedId)) {
-          const messages = await getMessages(savedId);
+          const [messages, conversationModel] = await Promise.all([
+            getMessages(savedId),
+            getConversationModel(savedId),
+          ]);
 
           if (!mounted) return;
 
@@ -63,6 +77,11 @@ export default function DashboardLayout() {
                 : conversation
             )
           );
+
+          if (conversationModel) {
+            setSelectedModel(conversationModel);
+            saveSelectedModel(conversationModel);
+          }
 
           setActiveId(savedId);
         } else {
@@ -101,7 +120,7 @@ export default function DashboardLayout() {
     setLoadError("");
   }
 
-  // Fetch messages BEFORE mounting ChatWindow.
+  // Fetch messages before mounting ChatWindow.
   async function handleSelectConversation(id: string) {
     const requestId = ++selectionRequest.current;
 
@@ -109,9 +128,11 @@ export default function DashboardLayout() {
     setLoadError("");
 
     try {
-      const messages = await getMessages(id);
+      const [messages, savedModel] = await Promise.all([
+        getMessages(id),
+        getConversationModel(id),
+      ]);
 
-      // Ignore an outdated request if another chat was selected.
       if (requestId !== selectionRequest.current) return;
 
       setConversations((previous) =>
@@ -122,16 +143,11 @@ export default function DashboardLayout() {
         )
       );
 
-      const savedModel = await getConversationModel(id);
-
-      if (requestId !== selectionRequest.current) return;
-
       if (savedModel) {
         setSelectedModel(savedModel);
         saveSelectedModel(savedModel);
       }
 
-      // Set active chat only after its messages have been loaded.
       setActiveId(id);
       localStorage.setItem(ACTIVE_CHAT_KEY, id);
     } catch (error) {
@@ -145,6 +161,39 @@ export default function DashboardLayout() {
     }
   }
 
+  // Delete a conversation from Supabase and local state.
+  async function handleDeleteConversation(id: string) {
+    if (deletingId) return;
+
+    setDeletingId(id);
+    setLoadError("");
+
+    try {
+      await deleteConversation(id);
+
+      // Ignore any conversation selection that was still loading.
+      selectionRequest.current += 1;
+
+      setConversations((previous) =>
+        previous.filter((conversation) => conversation.id !== id)
+      );
+
+      // If the deleted conversation was open, return to a new chat.
+      if (activeId === id) {
+        setActiveId(null);
+        localStorage.removeItem(ACTIVE_CHAT_KEY);
+      }
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+
+      setLoadError(
+        "Couldn't delete this conversation. Please try again."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   // Add a new conversation to local state.
   function handleConversationStart(id: string, message: string) {
     const userMessage: ChatMessage = {
@@ -155,7 +204,6 @@ export default function DashboardLayout() {
     };
 
     localStorage.setItem(ACTIVE_CHAT_KEY, id);
-
     setActiveId(id);
 
     setConversations((previous) => {
@@ -206,29 +254,27 @@ export default function DashboardLayout() {
     localStorage.setItem(ACTIVE_CHAT_KEY, id);
   }
 
-  useEffect(() => {
-  const savedModel = getSavedModel();
-
-  if (savedModel) {
-    setSelectedModel(savedModel);
+  // Save the selected model preference.
+  function handleModelChange(modelId: string) {
+    setSelectedModel(modelId);
+    saveSelectedModel(modelId);
   }
-}, []);
 
-function handleModelChange(modelId: string) {
-  setSelectedModel(modelId);
-  saveSelectedModel(modelId);
-}
+  // Shared sidebar props.
+  const sidebarProps = {
+    conversations,
+    activeId,
+    onSelect: handleSelectConversation,
+    onNewChat: handleNewChat,
+    onDelete: handleDeleteConversation,
+    deletingId,
+  };
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-[#141416] text-white">
       {/* Desktop sidebar */}
       <aside className="hidden w-[280px] shrink-0 lg:flex">
-        <ChatSidebar
-          conversations={conversations}
-          activeId={activeId}
-          onSelect={handleSelectConversation}
-          onNewChat={handleNewChat}
-        />
+        <ChatSidebar {...sidebarProps} />
       </aside>
 
       {/* Mobile sidebar */}
@@ -236,10 +282,7 @@ function handleModelChange(modelId: string) {
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <aside className="relative z-10 flex h-full w-[280px] max-w-[85vw] shrink-0 shadow-2xl">
             <ChatSidebar
-              conversations={conversations}
-              activeId={activeId}
-              onSelect={handleSelectConversation}
-              onNewChat={handleNewChat}
+              {...sidebarProps}
               onClose={() => setSidebarOpen(false)}
             />
           </aside>

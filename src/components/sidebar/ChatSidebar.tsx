@@ -23,6 +23,8 @@ type Props = {
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onClose?: () => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
 };
 
 export default function ChatSidebar({
@@ -31,6 +33,8 @@ export default function ChatSidebar({
   onSelect,
   onNewChat,
   onClose,
+  onDelete,
+  deletingId,
 }: Props) {
   const router = useRouter();
 
@@ -155,17 +159,27 @@ export default function ChatSidebar({
 
         {filtered.length > 0 ? (
           <div className="space-y-1">
-            {filtered.map((conversation) => (
-              <ConversationItem
-                key={conversation.id}
-                conversation={conversation}
-                active={activeId === conversation.id}
-                onClick={() => {
-                  onSelect(conversation.id);
-                  onClose?.();
-                }}
-              />
-            ))}
+{filtered.map((conversation) => (
+  <ConversationItem
+    key={conversation.id}
+    conversation={conversation}
+    active={activeId === conversation.id}
+    deleting={deletingId === conversation.id}
+    onClick={() => {
+      onSelect(conversation.id);
+      onClose?.();
+    }}
+    onDelete={() => {
+      const confirmed = window.confirm(
+        `Delete "${conversation.title}"? This will permanently delete the conversation and its messages.`
+      );
+
+      if (confirmed) {
+        onDelete(conversation.id);
+      }
+    }}
+  />
+))}
           </div>
         ) : (
           <p className="px-2 py-4 text-center text-sm text-zinc-600">
