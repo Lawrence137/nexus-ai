@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { Menu } from "lucide-react";
+import { Menu, RefreshCw } from "lucide-react";
 
 import type { ChatMessage } from "@/types/chat";
 import ModelSelector from "./ModelSelector";
@@ -73,9 +73,11 @@ export default function ChatWindow({
   } = useChat({
     id: chatId,
     messages: toUIMessages(initialMessages),
+
     onFinish: ({ messages }) => {
       onMessagesChange(chatId, toChatMessages(messages));
     },
+
     onError: (error) => {
       console.error("Chat error:", error);
     },
@@ -112,6 +114,16 @@ export default function ChatWindow({
     });
   }
 
+  async function handleRetry() {
+    if (status !== "ready" || !error) return;
+
+    await regenerate({
+      body: {
+        modelId: selectedModel,
+      },
+    });
+  }
+
   const displayMessages = toChatMessages(messages);
 
   return (
@@ -130,6 +142,7 @@ export default function ChatWindow({
             <p className="text-sm font-medium text-white">
               {title || "New conversation"}
             </p>
+
             <p className="text-xs text-zinc-500">
               AI workspace
             </p>
@@ -160,9 +173,24 @@ export default function ChatWindow({
         )}
 
         {error && (
-          <p className="mx-auto mb-3 w-full max-w-3xl px-4 text-sm text-red-400">
-            Something went wrong. Please try again.
-          </p>
+          <div
+            role="alert"
+            className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3"
+          >
+            <p className="text-sm text-red-400">
+              Your response couldn't be generated. Please try again.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={status !== "ready"}
+              className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RefreshCw size={14} />
+              Retry
+            </button>
+          </div>
         )}
       </div>
 
