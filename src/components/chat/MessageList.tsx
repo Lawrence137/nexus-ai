@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -9,11 +8,13 @@ import MessageBubble from "./MessageBubble";
 type Props = {
   messages: ChatMessage[];
   isWaiting?: boolean;
+  onRegenerate?: () => void;
 };
 
 export default function MessageList({
   messages,
   isWaiting = false,
+  onRegenerate,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -24,10 +25,24 @@ export default function MessageList({
     });
   }, [messages, isWaiting]);
 
+  const lastAssistantIndex = messages.reduce(
+    (lastIndex, message, index) =>
+      message.role === "assistant" ? index : lastIndex,
+    -1
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+      {messages.map((message, index) => (
+        <MessageBubble
+          key={message.id}
+          message={message}
+          onRegenerate={
+            index === lastAssistantIndex
+              ? onRegenerate
+              : undefined
+          }
+        />
       ))}
 
       {isWaiting && (

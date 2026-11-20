@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRef, useState } from "react";
@@ -67,7 +66,8 @@ export default function ChatWindow({
   const {
     messages,
     sendMessage,
-    stop, 
+    regenerate,
+    stop,
     status,
     error,
   } = useChat({
@@ -81,7 +81,8 @@ export default function ChatWindow({
     },
   });
 
-  const isLoading = status === "submitted" || status === "streaming";
+  const isLoading =
+    status === "submitted" || status === "streaming";
 
   async function handleSend(message: string) {
     if (status !== "ready") return;
@@ -92,13 +93,23 @@ export default function ChatWindow({
     }
 
     await sendMessage(
-  { text: message },
-  {
-    body: {
-      modelId: selectedModel,
-    },
+      { text: message },
+      {
+        body: {
+          modelId: selectedModel,
+        },
+      }
+    );
   }
-);
+
+  async function handleRegenerate() {
+    if (status !== "ready") return;
+
+    await regenerate({
+      body: {
+        modelId: selectedModel,
+      },
+    });
   }
 
   const displayMessages = toChatMessages(messages);
@@ -140,6 +151,11 @@ export default function ChatWindow({
           <MessageList
             messages={displayMessages}
             isWaiting={status === "submitted"}
+            onRegenerate={
+              status === "ready"
+                ? handleRegenerate
+                : undefined
+            }
           />
         )}
 

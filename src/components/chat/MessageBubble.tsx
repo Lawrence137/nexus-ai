@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Bot, User, Copy, Check } from "lucide-react";
+import {
+  Bot,
+  User,
+  Copy,
+  Check,
+  RefreshCw,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -12,6 +18,7 @@ import type { ChatMessage } from "@/types/chat";
 
 type Props = {
   message: ChatMessage;
+  onRegenerate?: () => void;
 };
 
 type CodeBlockProps = {
@@ -95,8 +102,25 @@ function CodeBlock({
   );
 }
 
-export default function MessageBubble({ message }: Props) {
+export default function MessageBubble({
+  message,
+  onRegenerate,
+}: Props) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopyResponse() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy response:", error);
+    }
+  }
 
   return (
     <div
@@ -110,87 +134,126 @@ export default function MessageBubble({ message }: Props) {
         </div>
       )}
 
-      <div
-        className={`min-w-0 max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 sm:max-w-[75%] ${
-          isUser
-            ? "whitespace-pre-wrap break-words bg-violet-600 text-white"
-            : "overflow-hidden border border-white/10 bg-white/[0.04] text-zinc-200"
-        }`}
-      >
-        {isUser ? (
-          message.content
-        ) : (
-          <div
-            className="
-              w-full min-w-0 break-words
-              [&_a]:text-violet-400
-              [&_a]:underline
-              [&_blockquote]:my-3
-              [&_blockquote]:border-l-2
-              [&_blockquote]:border-violet-500
-              [&_blockquote]:pl-4
-              [&_blockquote]:text-zinc-400
-              [&_h1]:mb-3
-              [&_h1]:mt-5
-              [&_h1]:text-xl
-              [&_h1]:font-bold
-              [&_h2]:mb-3
-              [&_h2]:mt-5
-              [&_h2]:text-lg
-              [&_h2]:font-semibold
-              [&_h3]:mb-2
-              [&_h3]:mt-4
-              [&_h3]:font-semibold
-              [&_hr]:my-5
-              [&_li]:ml-5
-              [&_li]:list-disc
-              [&_ol_li]:list-decimal
-              [&_p]:mb-3
-              [&_table]:my-4
-              [&_table]:w-full
-              [&_td]:border
-              [&_td]:border-white/10
-              [&_td]:p-2
-              [&_th]:border
-              [&_th]:border-white/10
-              [&_th]:bg-white/5
-              [&_th]:p-2
-            "
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={{
-                pre({ children }) {
-                  return <>{children}</>;
-                },
+      <div className="min-w-0 max-w-[85%] sm:max-w-[75%]">
+        <div
+          className={`min-w-0 rounded-2xl px-4 py-3 text-sm leading-7 ${
+            isUser
+              ? "whitespace-pre-wrap break-words bg-violet-600 text-white"
+              : "overflow-hidden border border-white/10 bg-white/[0.04] text-zinc-200"
+          }`}
+        >
+          {isUser ? (
+            message.content
+          ) : (
+            <div
+              className="
+                w-full min-w-0 break-words
+                [&_a]:text-violet-400
+                [&_a]:underline
+                [&_blockquote]:my-3
+                [&_blockquote]:border-l-2
+                [&_blockquote]:border-violet-500
+                [&_blockquote]:pl-4
+                [&_blockquote]:text-zinc-400
+                [&_h1]:mb-3
+                [&_h1]:mt-5
+                [&_h1]:text-xl
+                [&_h1]:font-bold
+                [&_h2]:mb-3
+                [&_h2]:mt-5
+                [&_h2]:text-lg
+                [&_h2]:font-semibold
+                [&_h3]:mb-2
+                [&_h3]:mt-4
+                [&_h3]:font-semibold
+                [&_hr]:my-5
+                [&_li]:ml-5
+                [&_li]:list-disc
+                [&_ol_li]:list-decimal
+                [&_p]:mb-3
+                [&_table]:my-4
+                [&_table]:w-full
+                [&_td]:border
+                [&_td]:border-white/10
+                [&_td]:p-2
+                [&_th]:border
+                [&_th]:border-white/10
+                [&_th]:bg-white/5
+                [&_th]:p-2
+              "
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  pre({ children }) {
+                    return <>{children}</>;
+                  },
 
-                code({ children, className }) {
-                  const isBlock = Boolean(className);
+                  code({ children, className }) {
+                    const isBlock = Boolean(className);
 
-                  if (isBlock) {
-                    const code = getTextContent(children).replace(/\n$/, "");
+                    if (isBlock) {
+                      const code = getTextContent(children).replace(/\n$/, "");
+
+                      return (
+                        <CodeBlock
+                          className={className}
+                          code={code}
+                        >
+                          {children}
+                        </CodeBlock>
+                      );
+                    }
 
                     return (
-                      <CodeBlock
-                        className={className}
-                        code={code}
-                      >
+                      <code className="break-words rounded bg-black/30 px-1.5 py-0.5 text-violet-300">
                         {children}
-                      </CodeBlock>
+                      </code>
                     );
-                  }
+                  },
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
 
-                  return (
-                    <code className="break-words rounded bg-black/30 px-1.5 py-0.5 text-violet-300">
-                      {children}
-                    </code>
-                  );
-                },
-              }}
+        {!isUser && (
+          <div className="mt-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleCopyResponse}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+              aria-label="Copy response"
+              title="Copy response"
             >
-              {message.content}
-            </ReactMarkdown>
+              {copied ? (
+                <>
+                  <Check size={14} />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy size={14} />
+                  Copy
+                </>
+              )}
+            </button>
+
+            {onRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                aria-label="Regenerate response"
+                title="Regenerate response"
+              >
+                <RefreshCw size={14} />
+                Regenerate
+              </button>
+            )}
           </div>
         )}
       </div>
