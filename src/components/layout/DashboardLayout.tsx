@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -28,6 +27,11 @@ export default function DashboardLayout() {
 
   function handleNewChat() {
     setActiveId(null);
+    setSidebarOpen(false);
+  }
+
+  function handleSelectConversation(id: string) {
+    setActiveId(id);
     setSidebarOpen(false);
   }
 
@@ -86,52 +90,53 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[#141416] text-white">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#141416] text-white">
       {/* Desktop sidebar */}
-      <div className="hidden w-[280px] shrink-0 lg:block">
+      <aside className="hidden w-[280px] shrink-0 lg:flex">
         <ChatSidebar
           conversations={conversations}
           activeId={activeId}
           onSelect={setActiveId}
           onNewChat={handleNewChat}
         />
-      </div>
+      </aside>
 
       {/* Mobile sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="w-[280px] max-w-[85vw]">
+          <aside className="relative z-10 flex h-full w-[280px] max-w-[85vw] shrink-0 shadow-2xl">
             <ChatSidebar
               conversations={conversations}
               activeId={activeId}
-              onSelect={(id) => {
-                setActiveId(id);
-                setSidebarOpen(false);
-              }}
+              onSelect={handleSelectConversation}
               onNewChat={handleNewChat}
               onClose={() => setSidebarOpen(false)}
             />
-          </div>
+          </aside>
 
           <button
+            type="button"
             onClick={() => setSidebarOpen(false)}
-            className="flex-1 bg-black/60"
-            aria-label="Close sidebar overlay"
+            className="absolute inset-0 bg-black/60"
+            aria-label="Close sidebar"
           />
         </div>
       )}
 
-      <ChatWindow
-        key={activeId ?? "new-chat"}
-        conversationId={activeId ?? undefined}
-        title={activeConversation?.title}
-        initialMessages={activeConversation?.messages ?? []}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        onMenuClick={() => setSidebarOpen(true)}
-        onConversationStart={handleConversationStart}
-        onMessagesChange={handleMessagesChange}
-      />
+      {/* Main chat area */}
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <ChatWindow
+          key={activeId ?? "new-chat"}
+          conversationId={activeId ?? undefined}
+          title={activeConversation?.title}
+          initialMessages={activeConversation?.messages ?? []}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          onMenuClick={() => setSidebarOpen(true)}
+          onConversationStart={handleConversationStart}
+          onMessagesChange={handleMessagesChange}
+        />
+      </div>
     </div>
   );
 }
