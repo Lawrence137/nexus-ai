@@ -15,6 +15,7 @@ import ModelSelector from "./ModelSelector";
 import WelcomeScreen from "./WelcomeScreen";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
+import { generateConversationTitle } from "@/lib/chat-utils"; 
 
 type Props = {
   conversationId?: string;
@@ -120,11 +121,13 @@ export default function ChatWindow({
       if (!startedRef.current) {
         // Create the database conversation using the same ID
         // already assigned to this AI chat.
-        await createConversation(
-          message,
-          selectedModel,
-          chatId
-        );
+const conversationTitle = generateConversationTitle(message);
+
+await createConversation(
+  conversationTitle,
+  selectedModel,
+  chatId
+);
 
         onConversationStart(chatId, message);
         startedRef.current = true;

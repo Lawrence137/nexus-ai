@@ -12,6 +12,7 @@ import {
 
 import { DEFAULT_MODEL } from "@/lib/ai/model-registry";
 import type { Conversation, ChatMessage } from "@/types/chat";
+import { generateConversationTitle } from "@/lib/chat-utils"; 
 
 const ACTIVE_CHAT_KEY = "nexus-active-conversation";
 
@@ -164,7 +165,7 @@ export default function DashboardLayout() {
       return [
         {
           id,
-          title: message.slice(0, 40),
+          title: generateConversationTitle(message),
           updatedAt: new Date(),
           messages: [userMessage],
         },
