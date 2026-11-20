@@ -1,42 +1,30 @@
-
 import type { ModelConfig } from "@/types/chat";
 
 export const MODELS: ModelConfig[] = [
   {
-    id: "openai:gpt-model",
-    name: "GPT",
-    provider: "openai",
-    description: "General-purpose AI assistant",
-    badge: "Popular",
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      structuredOutput: true,
-    },
-  },
-  {
-    id: "anthropic:claude-model",
-    name: "Claude",
-    provider: "anthropic",
-    description: "Reasoning and writing assistant",
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      structuredOutput: true,
-    },
-  },
-  {
-    id: "google:gemini-model",
-    name: "Gemini",
+    id: "google:gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
     provider: "google",
-    description: "Multimodal AI assistant",
+    description: "Fast general-purpose AI assistant",
+    badge: "Google",
     capabilities: {
       streaming: true,
       tools: true,
       vision: true,
       structuredOutput: true,
+    },
+  },
+  {
+    id: "groq:openai/gpt-oss-20b",
+    name: "GPT OSS 20B",
+    provider: "groq",
+    description: "Fast open-weight reasoning model",
+    badge: "Groq",
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: false,
+      structuredOutput: false,
     },
   },
 ];

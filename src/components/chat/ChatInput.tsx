@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Paperclip,
   X,
+  LoaderCircle,
 } from "lucide-react";
 
 type Props = {
@@ -37,7 +38,11 @@ export default function ChatInput({
           <Paperclip size={14} />
           <span className="max-w-48 truncate">{file.name}</span>
           <button
-            onClick={() => setFile(null)}
+            type="button"
+            onClick={() => {
+              setFile(null);
+              if (fileRef.current) fileRef.current.value = "";
+            }}
             aria-label="Remove attachment"
           >
             <X size={14} />
@@ -72,8 +77,10 @@ export default function ChatInput({
           />
 
           <button
+            type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-white/10 hover:text-white"
+            disabled={disabled}
+            className="rounded-lg p-2 text-zinc-500 hover:bg-white/10 hover:text-white disabled:opacity-40"
             aria-label="Attach file"
           >
             <Paperclip size={18} />
@@ -81,12 +88,17 @@ export default function ChatInput({
         </div>
 
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!value.trim() || disabled}
           className="flex size-9 items-center justify-center rounded-xl bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Send message"
         >
-          <ArrowUp size={19} />
+          {disabled ? (
+            <LoaderCircle size={19} className="animate-spin" />
+          ) : (
+            <ArrowUp size={19} />
+          )}
         </button>
       </div>
     </div>

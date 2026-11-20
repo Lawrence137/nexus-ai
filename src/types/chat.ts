@@ -1,5 +1,5 @@
 
-export type ProviderId = "openai" | "anthropic" | "google";
+export type ProviderId = "openai" | "anthropic" | "google" | "groq";
 
 export type ModelConfig = {
   id: string;
