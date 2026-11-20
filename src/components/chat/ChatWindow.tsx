@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { Menu, RefreshCw } from "lucide-react";
@@ -9,6 +9,7 @@ import type { ChatMessage } from "@/types/chat";
 import {
   createConversation,
   upsertMessage,
+  updateConversationModel,
 } from "@/lib/supabase/chat";
 
 import ModelSelector from "./ModelSelector";
@@ -16,6 +17,7 @@ import WelcomeScreen from "./WelcomeScreen";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 import { generateConversationTitle } from "@/lib/chat-utils"; 
+
 
 type Props = {
   conversationId?: string;
@@ -72,6 +74,16 @@ export default function ChatWindow({
   const startedRef = useRef(
     Boolean(conversationId) || initialMessages.length > 0
   );
+
+  useEffect(() => {
+  if (!conversationId || !startedRef.current) return;
+
+  updateConversationModel(conversationId, selectedModel).catch(
+    (error) => {
+      console.error("Failed to update conversation model:", error);
+    }
+  );
+}, [conversationId, selectedModel]);
 
   const {
     messages,

@@ -13,6 +13,8 @@ import {
 import { DEFAULT_MODEL } from "@/lib/ai/model-registry";
 import type { Conversation, ChatMessage } from "@/types/chat";
 import { generateConversationTitle } from "@/lib/chat-utils"; 
+import { getSavedModel, saveSelectedModel } from "@/lib/ai/model-preference"; 
+import { getConversationModel } from "@/lib/supabase/chat";
 
 const ACTIVE_CHAT_KEY = "nexus-active-conversation";
 
@@ -120,6 +122,15 @@ export default function DashboardLayout() {
         )
       );
 
+      const savedModel = await getConversationModel(id);
+
+      if (requestId !== selectionRequest.current) return;
+
+      if (savedModel) {
+        setSelectedModel(savedModel);
+        saveSelectedModel(savedModel);
+      }
+
       // Set active chat only after its messages have been loaded.
       setActiveId(id);
       localStorage.setItem(ACTIVE_CHAT_KEY, id);
@@ -195,6 +206,19 @@ export default function DashboardLayout() {
     localStorage.setItem(ACTIVE_CHAT_KEY, id);
   }
 
+  useEffect(() => {
+  const savedModel = getSavedModel();
+
+  if (savedModel) {
+    setSelectedModel(savedModel);
+  }
+}, []);
+
+function handleModelChange(modelId: string) {
+  setSelectedModel(modelId);
+  saveSelectedModel(modelId);
+}
+
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-[#141416] text-white">
       {/* Desktop sidebar */}
@@ -251,7 +275,7 @@ export default function DashboardLayout() {
             title={activeConversation?.title}
             initialMessages={activeConversation?.messages ?? []}
             selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
+            onModelChange={handleModelChange}
             onMenuClick={() => setSidebarOpen(true)}
             onConversationStart={handleConversationStart}
             onMessagesChange={handleMessagesChange}

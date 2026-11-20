@@ -260,3 +260,41 @@ export async function upsertMessage(
     throw new Error(`Failed to save message: ${error.message}`);
   }
 }
+
+export async function getConversationModel(
+  conversationId: string
+): Promise<string | null> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("model_id")
+    .eq("id", conversationId)
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Failed to load conversation model: ${error.message}`
+    );
+  }
+
+  return data.model_id;
+}
+
+export async function updateConversationModel(
+  conversationId: string,
+  modelId: string
+): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("conversations")
+    .update({ model_id: modelId })
+    .eq("id", conversationId);
+
+  if (error) {
+    throw new Error(
+      `Failed to update conversation model: ${error.message}`
+    );
+  }
+}
