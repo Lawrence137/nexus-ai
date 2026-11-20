@@ -67,6 +67,7 @@ export default function ChatWindow({
   const {
     messages,
     sendMessage,
+    stop, 
     status,
     error,
   } = useChat({
@@ -153,6 +154,7 @@ export default function ChatWindow({
         <div className="mx-auto w-full max-w-3xl">
           <ChatInput
             onSend={handleSend}
+            onStop={stop}
             disabled={isLoading}
           />
 

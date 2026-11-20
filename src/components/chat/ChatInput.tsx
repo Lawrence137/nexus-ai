@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRef, useState } from "react";
@@ -6,16 +5,18 @@ import {
   ArrowUp,
   Paperclip,
   X,
-  LoaderCircle,
+  Square,
 } from "lucide-react";
 
 type Props = {
   onSend: (message: string) => void;
+  onStop: () => void;
   disabled?: boolean;
 };
 
 export default function ChatInput({
   onSend,
+  onStop,
   disabled = false,
 }: Props) {
   const [value, setValue] = useState("");
@@ -37,6 +38,7 @@ export default function ChatInput({
         <div className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
           <Paperclip size={14} />
           <span className="max-w-48 truncate">{file.name}</span>
+
           <button
             type="button"
             onClick={() => {
@@ -87,19 +89,27 @@ export default function ChatInput({
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!value.trim() || disabled}
-          className="flex size-9 items-center justify-center rounded-xl bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label="Send message"
-        >
-          {disabled ? (
-            <LoaderCircle size={19} className="animate-spin" />
-          ) : (
+        {disabled ? (
+          <button
+            type="button"
+            onClick={onStop}
+            className="flex size-9 items-center justify-center rounded-xl bg-red-500 text-white transition hover:bg-red-400"
+            aria-label="Stop generating"
+            title="Stop generating"
+          >
+            <Square size={15} fill="currentColor" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!value.trim()}
+            className="flex size-9 items-center justify-center rounded-xl bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label="Send message"
+          >
             <ArrowUp size={19} />
-          )}
-        </button>
+          </button>
+        )}
       </div>
     </div>
   );
